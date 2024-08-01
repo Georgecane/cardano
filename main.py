@@ -3,6 +3,7 @@ import re
 import os
 import platform
 from decimal import Decimal, getcontext
+import math
 
 getcontext().prec = 30
 
@@ -28,6 +29,8 @@ def preprocess_expression(expression):
 
     processed_expression = re.sub(r'nroot\((\d+),\s*(\d+)\)', r'compute_nroot(\1, \2)', processed_expression)
 
+    processed_expression = processed_expression.replace('nPr', 'math.perm')
+    processed_expression = processed_expression.replace('nCr', 'sp.binomial')
     return processed_expression
 
 def compute_derivative(expression, var):
@@ -67,18 +70,20 @@ def evaluate_expression(expression):
         processed_expression = preprocess_expression(expression)
         print(f"Processed Expression: {processed_expression}")
 
-        eval_dict = {'sp': sp, 'Decimal': Decimal, 'compute_nroot': compute_nroot,
-                     'compute_determinant': compute_determinant,
-                     'compute_inverse': compute_inverse, 'compute_eigenvalues': compute_eigenvalues,
-                     'compute_eigenvectors': compute_eigenvectors, 'multiply_matrices': multiply_matrices,
-                     'add_matrices': add_matrices, 'transpose_matrix': transpose_matrix,
-                     **variables, **functions}
+        eval_dict = {
+            'sp': sp, 'Decimal': Decimal, 'compute_nroot': compute_nroot,
+            'compute_determinant': compute_determinant, 'compute_inverse': compute_inverse,
+            'compute_eigenvalues': compute_eigenvalues, 'compute_eigenvectors': compute_eigenvectors,
+            'multiply_matrices': multiply_matrices, 'add_matrices': add_matrices,
+            'transpose_matrix': transpose_matrix, **variables, **functions,
+            'math': math
+        }
 
         # Define symbols
         symbols = re.findall(r'\b[a-zA-Z_]\w*\b', processed_expression)
         for symbol in symbols:
-            if symbol not in variables and symbol not in functions:
-                variables[symbol] = sp.Symbol(symbol)
+            if symbol not in eval_dict:
+                eval_dict[symbol] = sp.Symbol(symbol)
 
         # Check for function calls
         match = re.match(r'(\w+)\((.*)\)', processed_expression)
@@ -90,7 +95,7 @@ def evaluate_expression(expression):
                 evaluated_arg = sp.sympify(func_arg, locals=eval_dict)
                 evaluated_expression = func(evaluated_arg)
             else:
-                return f"Function {func_name} is not defined."
+                evaluated_expression = sp.sympify(processed_expression, locals=eval_dict)
         else:
             evaluated_expression = sp.sympify(processed_expression, locals=eval_dict)
 
