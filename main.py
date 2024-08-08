@@ -32,6 +32,8 @@ def preprocess_expression(expression):
     processed_expression = processed_expression.replace('nPr', 'math.perm')
     processed_expression = processed_expression.replace('nCr', 'sp.binomial')
     processed_expression = processed_expression.replace('oo', 'sp.oo')
+    processed_expression = processed_expression.replace('pi', 'math.pi')
+    processed_expression = processed_expression.replace('mathe', 'math.e')
 
     return processed_expression
 
