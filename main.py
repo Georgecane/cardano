@@ -31,6 +31,8 @@ def preprocess_expression(expression):
 
     processed_expression = processed_expression.replace('nPr', 'math.perm')
     processed_expression = processed_expression.replace('nCr', 'sp.binomial')
+    processed_expression = processed_expression.replace('oo', 'sp.oo')
+
     return processed_expression
 
 def compute_derivative(expression, var):
@@ -355,8 +357,74 @@ def get_help():
         "17. `exit` - Exit the CLI.\n"
         "18. `clear all` - Clear all variables, matrices, and functions.\n"
         "19. `help` - Display this help message\n"
-
     )
+
+def compute_infinite_series(expression, var, n):
+    try:
+        processed_expression = preprocess_expression(expression)
+        expr = sp.sympify(processed_expression)
+        var_symbol = sp.Symbol(var)
+        series = sp.Sum(expr, (var_symbol, 0, n)).doit()
+        return clean_multiplication(str(preprocess_expression(str(series))))
+    except Exception as e:
+        return f"Error in compute_infinite_series: {e}"
+
+def compute_large_sum(expression, var, start, end):
+    try:
+        processed_expression = preprocess_expression(expression)
+        expr = sp.sympify(processed_expression)
+        var_symbol = sp.Symbol(var)
+        result = sp.Sum(expr, (var_symbol, start, end)).doit()
+        return clean_multiplication(str(preprocess_expression(str(result))))
+    except Exception as e:
+        return f"Error in compute_large_sum: {e}"
+
+def compute_large_product(expression, var, start, end):
+    try:
+        processed_expression = preprocess_expression(expression)
+        expr = sp.sympify(processed_expression)
+        var_symbol = sp.Symbol(var)
+        result = sp.Product(expr, (var_symbol, start, end)).doit()
+        return clean_multiplication(str(preprocess_expression(str(result))))
+    except Exception as e:
+        return f"Error in compute_large_product: {e}"
+
+
+def compute_sum(expression, var, start):
+    try:
+        processed_expression = preprocess_expression(expression)
+        expr = sp.sympify(processed_expression)
+        var_symbol = sp.Symbol(var)
+
+        # Check for convergence using the ratio test
+        ratio_test = sp.limit(expr.subs(var_symbol, var_symbol + 1) / expr, var_symbol, sp.oo)
+
+        if ratio_test < 1:
+            result = sp.sympify(sp.summation(expr, (var_symbol, start, sp.oo)))
+            return f"The series is convergent and approaches {clean_multiplication(str(result))}."
+        else:
+            return "The series is divergent."
+    except Exception as e:
+        return f"Error in compute_sum: {e}"
+
+
+def compute_product(expression, var, start):
+    try:
+        processed_expression = preprocess_expression(expression)
+        expr = sp.sympify(processed_expression)
+        var_symbol = sp.Symbol(var)
+
+        # Check for convergence using the limit comparison test
+        limit_result = sp.limit(expr, var_symbol, sp.oo)
+
+        if limit_result != 1:
+            result = sp.sympify(sp.Product(expr, (var_symbol, start, sp.oo)).doit())
+            return f"The product is convergent and approaches {clean_multiplication(str(result))}."
+        else:
+            return "The product is divergent."
+    except Exception as e:
+        return f"Error in compute_product: {e}"
+
 
 while True:
     try:
@@ -378,9 +446,9 @@ while True:
         elif user_input.lower() == "help":
             print(get_help())
 
-        elif '=' in user_input and '::' not in user_input and ':=' not in user_input:
+        elif '=' in user_input and '::' not in user_input and ':=' not in user_input and ':==' not in user_input:
             print(solve_equation(user_input))
-        elif '{' in user_input and '}' in user_input:
+        elif '{' in user_input and '}' in user_input and '->' not in user_input:
             print(solve_system_of_equations(user_input))
         elif ':=' in user_input:
             print(define_variable(user_input))
@@ -451,7 +519,39 @@ while True:
             if match:
                 expression, var, order = match.groups()
                 print(compute_higher_order_derivative(expression, var, int(order)))
+
+        elif 'infinite series' in user_input:
+            match = re.match(r'infinite series\((.*),\s*(.*),\s*(.*)\)', user_input)
+            if match:
+                expression, var, n = match.groups()
+                print(compute_infinite_series(expression, var, int(n)))
+
+        elif 'sum' in user_input and "i" not in user_input:
+            match = re.match(r'sum\((.*),\s*(.*),\s*(.*),\s*(.*)\)', user_input)
+            if match:
+                expression, var, start, end = match.groups()
+                print(compute_large_sum(expression, var, int(start), int(end)))
+
+        elif 'product' in user_input and "i" not in user_input:
+            match = re.match(r'product\((.*),\s*(.*),\s*(.*),\s*(.*)\)', user_input)
+            if match:
+                expression, var, start, end = match.groups()
+                print(compute_large_product(expression, var, int(start), int(end)))
+
+        elif 'isum' in user_input:
+            match = re.match(r'isum\((.*),\s*(.*),\s*(.*)\)', user_input)
+            if match:
+                expression, var, start = match.groups()
+                print(compute_sum(expression, var, int(start)))
+
+        elif 'iproduct' in user_input:
+            match = re.match(r'iproduct\((.*),\s*(.*),\s*(.*)\)', user_input)
+            if match:
+                expression, var, start = match.groups()
+                print(compute_product(expression, var, int(start)))
+
         else:
             print(evaluate_expression(user_input))
+
     except Exception as e:
         print(f"Error in main loop: {e}")
