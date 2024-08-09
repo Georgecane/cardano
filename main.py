@@ -10,6 +10,16 @@ getcontext().prec = 30
 variables = {}
 matrices = {}
 functions = {}
+user_sets = {}
+algebraic_structures = {}
+
+number_sets = {
+    'N': sp.Naturals,
+    'Z': sp.Integers,
+    'Q': sp.Rationals,
+    'R': sp.Reals,
+    'C': sp.Complexes,
+}
 
 def preprocess_expression(expression):
     processed_expression = expression.replace('**', '^')
@@ -34,6 +44,7 @@ def preprocess_expression(expression):
     processed_expression = processed_expression.replace('oo', 'sp.oo')
     processed_expression = processed_expression.replace('pi', 'math.pi')
     processed_expression = processed_expression.replace('mathe', 'math.e')
+    processed_expression = processed_expression.replace('set', 'define_set')
 
     return processed_expression
 
@@ -67,29 +78,27 @@ def convert_to_input_format(expression):
 def clean_multiplication(expression):
     expression = re.sub(r'(\d)\*([a-zA-Z])', r'\1\2', expression)
     expression = re.sub(r'([a-zA-Z])\*([a-zA-Z])', r'\1\2', expression)
+    expression = expression.replace("**", "^")
+
     return expression
 
 def evaluate_expression(expression):
     try:
         processed_expression = preprocess_expression(expression)
-        print(f"Processed Expression: {processed_expression}")
-
         eval_dict = {
             'sp': sp, 'Decimal': Decimal, 'compute_nroot': compute_nroot,
             'compute_determinant': compute_determinant, 'compute_inverse': compute_inverse,
             'compute_eigenvalues': compute_eigenvalues, 'compute_eigenvectors': compute_eigenvectors,
             'multiply_matrices': multiply_matrices, 'add_matrices': add_matrices,
-            'transpose_matrix': transpose_matrix, **variables, **functions,
+            'transpose_matrix': transpose_matrix, **variables, **functions, **number_sets, **user_sets, **algebraic_structures,
             'math': math
         }
 
-        # Define symbols
         symbols = re.findall(r'\b[a-zA-Z_]\w*\b', processed_expression)
         for symbol in symbols:
             if symbol not in eval_dict:
                 eval_dict[symbol] = sp.Symbol(symbol)
 
-        # Check for function calls
         match = re.match(r'(\w+)\((.*)\)', processed_expression)
         if match:
             func_name = match.group(1)
@@ -99,19 +108,23 @@ def evaluate_expression(expression):
                 evaluated_arg = sp.sympify(func_arg, locals=eval_dict)
                 evaluated_expression = func(evaluated_arg)
             else:
-                evaluated_expression = sp.sympify(processed_expression, locals=eval_dict)
+                raise ValueError(f"Function {func_name} is not defined.")
         else:
             evaluated_expression = sp.sympify(processed_expression, locals=eval_dict)
 
-        expanded_expression = sp.expand(evaluated_expression)
+        # Only apply expand if evaluated_expression is an instance of sp.Basic
+        if isinstance(evaluated_expression, sp.Basic):
+            expanded_expression = sp.expand(evaluated_expression)
+        else:
+            expanded_expression = evaluated_expression
+
         evaluated_numeric_expression = expanded_expression.evalf() if isinstance(expanded_expression, sp.Basic) else expanded_expression
         cleaned_numeric_result = clean_multiplication(str(evaluated_numeric_expression))
 
-        print(f"Expanded Expression: {expanded_expression}")
-        print(f"Numeric Evaluation: {cleaned_numeric_result}")
-        expanded_expression = preprocess_expression(str(expanded_expression))
         return clean_multiplication(str(expanded_expression))
 
+    except sp.SympifyError as e:
+        return f"Error in evaluating expression: {e}"
     except Exception as e:
         return f"Error in evaluate_expression: {e}"
 
@@ -194,12 +207,12 @@ def clear_matrix(name):
 
 def define_matrix(name, matrix_str):
     try:
-        matrix_str = matrix_str.strip()[1:-1]
-        rows = matrix_str.split(', ')
+        matrix_str = matrix_str.strip()[1:-1]  # Remove the curly braces
+        rows = matrix_str.split('}, {')
         matrix = []
         for row in rows:
-            elements = row.split()
-            matrix.append([sp.sympify(e) for e in elements])
+            elements = row.split(',')
+            matrix.append([sp.sympify(e.strip()) for e in elements])
         matrices[name] = sp.Matrix(matrix)
         return f"Matrix {name} defined."
     except Exception as e:
@@ -428,6 +441,95 @@ def compute_product(expression, var, start):
         return f"Error in compute_product: {e}"
 
 
+def define_set(name, set_definition):
+    try:
+        set_definition = set_definition.strip()
+
+        if not set_definition:
+            return "Set definition cannot be empty."
+
+        # Define finite sets like {1, 2, 3}
+        if set_definition.startswith('{') and set_definition.endswith('}') and "|" not in set_definition:
+            elements = set_definition[1:-1].split(',')
+            elements = [sp.sympify(e.strip()) for e in elements]
+            user_sets[name] = sp.FiniteSet(*elements)
+            return f"Set {name} defined as {user_sets[name]}."
+
+        # Define sets with conditions like {x | x ∈ R}
+        elif '|' in set_definition:
+            set_parts = set_definition.split('|')
+            if len(set_parts) != 2:
+                return "Invalid set definition format. Use '{x | x ∈ R}'."
+
+            variable = set_parts[0].strip()
+            condition = set_parts[1].strip()
+
+            # Replace '∈' with Python-compatible 'in'
+            condition = condition.replace('∈', 'in').replace('∉', 'not in')
+            variable_symbol = sp.Symbol(variable)
+
+            # Determine the universal set based on condition
+            if 'R' in condition:
+                universal_set = sp.S.Reals
+            elif 'Z' in condition:
+                universal_set = sp.S.Integers
+            elif 'Q' in condition:
+                universal_set = sp.S.Rationals
+            elif 'N' in condition:
+                universal_set = sp.S.Naturals
+            else:
+                return "Unknown universal set in condition."
+
+            # Parse the condition expression
+            try:
+                condition_expr = sp.sympify(condition, locals={**number_sets, **user_sets})
+            except Exception as e:
+                return f"Error in parsing condition expression: {e}"
+
+            user_sets[name] = sp.ConditionSet(variable_symbol, condition_expr, universal_set)
+            return f"Set {name} defined with condition: {user_sets[name]}."
+
+        else:
+            return "Invalid set definition format. Use '{1, 2, 3}' or '{x | x ∈ R}'."
+    except Exception as e:
+        return f"Error in define_set: {e}"
+
+def clear_set(name):
+    try:
+        if name in user_sets:
+            del user_sets[name]
+            return f"Set {name} cleared."
+        else:
+            return f"Set {name} does not exist."
+    except Exception as e:
+        return f"Error in clear_set: {e}"
+
+def define_algebraic_structure(structure_type, name, *parameters):
+    try:
+        if structure_type == 'group':
+            algebraic_structures[name] = {'type': 'group', 'parameters': parameters}
+        elif structure_type == 'ring':
+            algebraic_structures[name] = {'type': 'ring', 'parameters': parameters}
+        elif structure_type == 'field':
+            algebraic_structures[name] = {'type': 'field', 'parameters': parameters}
+        elif structure_type == 'monoid':
+            algebraic_structures[name] = {'type': 'monoid', 'parameters': parameters}
+        else:
+            return "Unknown algebraic structure type."
+        return f"{structure_type.capitalize()} {name} defined."
+    except Exception as e:
+        return f"Error in define_algebraic_structure: {e}"
+
+def clear_algebraic_structure(structure_name):
+    try:
+        if structure_name in algebraic_structures:
+            del algebraic_structures[structure_name]
+            return f"Algebraic structure {structure_name} cleared."
+        else:
+            return f"Algebraic structure {structure_name} does not exist."
+    except Exception as e:
+        return f"Error in clearing algebraic structure: {e}"
+
 while True:
     try:
         user_input = input("Cardano CLI > ")
@@ -442,19 +544,26 @@ while True:
                 print(clear_variable(name))
             elif name in matrices:
                 print(clear_matrix(name))
+
+            elif name in user_sets:
+                print(clear_set(name))
+
+            elif name in algebraic_structures:
+                print(clear_algebraic_structure(name))
+
             else:
                 print(f"{name} does not exist.")
 
         elif user_input.lower() == "help":
             print(get_help())
 
-        elif '=' in user_input and '::' not in user_input and ':=' not in user_input and ':==' not in user_input:
+        elif '=' in user_input and '::' not in user_input and ':=' not in user_input and ':==' not in user_input and "{" and "}" not in user_input:
             print(solve_equation(user_input))
-        elif '{' in user_input and '}' in user_input and '->' not in user_input:
+        elif '{' in user_input and '}' in user_input and '->' not in user_input and ":" not in user_input and 'set' not in user_input:
             print(solve_system_of_equations(user_input))
-        elif ':=' in user_input:
+        elif ':=' in user_input and '{' and '}' not in user_input:
             print(define_variable(user_input))
-        elif '::' in user_input:
+        elif '::' in user_input and ':::' not in user_input:
             print(define_function(user_input))
         elif 'det' in user_input:
             match = re.match(r'det\((\w+)\)', user_input)
@@ -492,10 +601,17 @@ while True:
                 matrix_name1, matrix_name2 = match.groups()
                 print(add_matrices(matrix_name1, matrix_name2))
         elif '{' in user_input and '}' in user_input:
-            matrix_match = re.match(r'(\w+)\s*:=\s*{\s*([^}]+)\s*}', user_input)
+            matrix_match = re.match(r'(\w+)\s*:=\s*\{\s*([^}]+)\s*\}', user_input)
             if matrix_match:
                 matrix_name, matrix_str = matrix_match.groups()
                 print(define_matrix(matrix_name, matrix_str))
+            else:
+                set_match = re.match(r'(\w+)\s*:\s*(\{.*\})', user_input)
+                if set_match:
+                    set_name, set_definition = set_match.groups()
+                    print(define_set(set_name, set_definition))
+                else:
+                    print("Invalid input format for set or matrix.")
         elif 'd/dx' in user_input:
             match = re.match(r'd/dx\((.*)\)', user_input)
             if match:
@@ -551,6 +667,36 @@ while True:
             if match:
                 expression, var, start = match.groups()
                 print(compute_product(expression, var, int(start)))
+
+        elif user_input in number_sets:
+            print(number_sets[user_input])
+
+        # Checking if the input is a defined set name
+        elif user_input in user_sets:
+            print(f"{user_input} = {user_sets[user_input]}")
+
+        elif user_input in algebraic_structures:
+            print(f"{user_input} = {algebraic_structures[user_input]}")
+
+        elif "group" in user_input:
+            match = re.match(r'(group)\s*([A-Za-z])\s*\((.*)\)', user_input)
+            if match:
+                print(define_algebraic_structure("group", match.group(2), match.group(3)))
+
+        elif "field" in user_input:
+            match = re.match(r'(field)\s*([A-Za-z])\s*\((.*)\)', user_input)
+            if match:
+                print(define_algebraic_structure("field", match.group(2), match.group(3)))
+
+        elif "ring" in user_input:
+            match = re.match(r'(ring)\s*([A-Za-z])\s*\((.*)\)', user_input)
+            if match:
+                print(define_algebraic_structure("ring", match.group(2), match.group(3)))
+
+        elif "monoid" in user_input:
+            match = re.match(r'(monoid)\s*([A-Za-z])\s*\((.*)\)', user_input)
+            if match:
+                print(define_algebraic_structure("monoid", match.group(2), match.group(3)))
 
         else:
             print(evaluate_expression(user_input))
