@@ -45,7 +45,7 @@ def preprocess_expression(expression):
     processed_expression = processed_expression.replace('set', 'define_set')
 
     processed_expression = processed_expression.replace('pi', 'sp.pi')
-    processed_expression = processed_expression.replace('mathe', 'math.e')
+    processed_expression = processed_expression.replace('mathe', '2.718281828459045235360287471352')
     processed_expression = processed_expression.replace("mp", "1.672621637 * 10 ^ -27")
     processed_expression = processed_expression.replace("mn", "1.674927211 * 10 ^ -27")
     processed_expression = processed_expression.replace("me", "9.10938215 * 10 ^ -31")
@@ -55,7 +55,7 @@ def preprocess_expression(expression):
     processed_expression = processed_expression.replace('μB', '9.27400915 * 10 -24')
     processed_expression = processed_expression.replace('ħ', '1.054571628 * 10 ^ -34')
     processed_expression = processed_expression.replace('Na', '6.02214076 * 10 ^ 23')
-    processed_expression = processed_expression.replace('C', '300000000')
+    processed_expression = processed_expression.replace('C_0', '300000000')
 
     return processed_expression
 
@@ -133,7 +133,6 @@ def evaluate_expression(expression):
 
 def solve_equation(equation):
     try:
-        # تنها معادلات ریاضی را پردازش کنید
         if '::' in equation or ':=' in equation:
             return "Invalid equation format. Use '=' for equations."
 
@@ -289,23 +288,32 @@ def transpose_matrix(matrix_name):
 
 def define_function(func_definition):
     try:
-        match = re.match(r'(\w+)\s*::\s*(\w+)\s*=\s*(.*)', func_definition)
+        # Regular expression to match multi-variable function definition like `f :: (x) = expr`
+        match = re.match(r'(\w+)\s*::\s*\(([\w\s,]+)\)\s*=\s*(.*)', func_definition)
+
         if match:
             func_name = match.group(1)
-            arg = match.group(2)
+            args = match.group(2).replace(" ", "").split(",")  # Split multiple arguments
             body = match.group(3)
 
-            arg_symbol = sp.Symbol(arg.strip())
+            # Convert argument names to SymPy symbols
+            arg_symbols = [sp.Symbol(arg) for arg in args]
 
+            # Process and convert the function body, including handling of custom functions like isum
             body_expr = preprocess_expression(body)
-            func_expr = sp.sympify(body_expr, locals={**variables, **functions, arg: arg_symbol})
+            func_expr = sp.sympify(body_expr, locals={
+                **variables, **functions, **number_sets,
+                **{arg: sp.Symbol(arg) for arg in args}
+            })
 
-            functions[func_name] = sp.Lambda(arg_symbol, func_expr)
-            return f"Function {func_name} defined."
+            # Create a Lambda function with arguments as a tuple
+            functions[func_name] = sp.Lambda(tuple(arg_symbols), func_expr)
+            return f"Function {func_name} defined with arguments ({', '.join(args)})."
         else:
-            return "Invalid function definition. The correct format is: func_name :: arg = body"
+            return "Invalid function definition. Use the format: func_name :: (arg1, arg2, ...) = body"
     except Exception as e:
         return f"Error in define_function: {e}"
+
 
 def compute_nroot(n, k):
     try:
