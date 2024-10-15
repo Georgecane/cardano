@@ -42,9 +42,20 @@ def preprocess_expression(expression):
     processed_expression = processed_expression.replace('nPr', 'math.perm')
     processed_expression = processed_expression.replace('nCr', 'sp.binomial')
     processed_expression = processed_expression.replace('oo', 'sp.oo')
-    processed_expression = processed_expression.replace('pi', 'math.pi')
-    processed_expression = processed_expression.replace('mathe', 'math.e')
     processed_expression = processed_expression.replace('set', 'define_set')
+
+    processed_expression = processed_expression.replace('pi', 'sp.pi')
+    processed_expression = processed_expression.replace('mathe', 'math.e')
+    processed_expression = processed_expression.replace("mp", "1.672621637 * 10 ^ -27")
+    processed_expression = processed_expression.replace("mn", "1.674927211 * 10 ^ -27")
+    processed_expression = processed_expression.replace("me", "9.10938215 * 10 ^ -31")
+    processed_expression = processed_expression.replace("mμ", "1.8835313 * 10 ^ -28")
+    processed_expression = processed_expression.replace('a_0', '5.291772086 * 10 ^ -11')
+    processed_expression = processed_expression.replace('μN', '5.05078324 * 10 ^ -27')
+    processed_expression = processed_expression.replace('μB', '9.27400915 * 10 -24')
+    processed_expression = processed_expression.replace('ħ', '1.054571628 * 10 ^ -34')
+    processed_expression = processed_expression.replace('Na', '6.02214076 * 10 ^ 23')
+    processed_expression = processed_expression.replace('C', '300000000')
 
     return processed_expression
 
@@ -99,27 +110,19 @@ def evaluate_expression(expression):
             if symbol not in eval_dict:
                 eval_dict[symbol] = sp.Symbol(symbol)
 
-        match = re.match(r'(\w+)\((.*)\)', processed_expression)
-        if match:
-            func_name = match.group(1)
-            func_arg = match.group(2)
-            if func_name in functions:
-                func = functions[func_name]
-                evaluated_arg = sp.sympify(func_arg, locals=eval_dict)
-                evaluated_expression = func(evaluated_arg)
-            else:
-                raise ValueError(f"Function {func_name} is not defined.")
-        else:
-            evaluated_expression = sp.sympify(processed_expression, locals=eval_dict)
+        evaluated_expression = sp.sympify(processed_expression, locals=eval_dict)
 
-        # Only apply expand if evaluated_expression is an instance of sp.Basic
         if isinstance(evaluated_expression, sp.Basic):
             expanded_expression = sp.expand(evaluated_expression)
         else:
             expanded_expression = evaluated_expression
 
-        evaluated_numeric_expression = expanded_expression.evalf() if isinstance(expanded_expression, sp.Basic) else expanded_expression
-        cleaned_numeric_result = clean_multiplication(str(evaluated_numeric_expression))
+        if expanded_expression.is_number:
+            if isinstance(evaluated_expression, sp.Rational):
+                if evaluated_expression.q == 1 or evaluated_expression.q % 2 == 0 or evaluated_expression.q % 5 == 0:
+                    return float(evaluated_expression)
+            else:
+                return str(expanded_expression.evalf())
 
         return clean_multiplication(str(expanded_expression))
 
@@ -164,7 +167,7 @@ def solve_system_of_equations(equations):
         solutions = sp.solve(sympy_eqs, list(variables_set))
         if solutions:
             cleaned_solutions = {}
-            for var, sol in solutions.items():
+            for var, sol in solutions:
                 cleaned_solutions[str(var)] = clean_multiplication(str(sol))
             return cleaned_solutions
         else:
