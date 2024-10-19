@@ -150,23 +150,30 @@ def solve_equation(equation):
 
 def solve_system_of_equations(equations):
     try:
+        # جداسازی معادلات با استفاده از جداکننده ',' و تبدیل به لیستی از معادلات
         eq_list = [eq.strip() for eq in equations.strip('{}').split(',')]
         sympy_eqs = []
         variables_set = set()
+
         for eq in eq_list:
+
             if eq.count('=') != 1:
                 return "Each equation must contain exactly one '=' sign."
-            processed_eq = preprocess_expression(eq)
-            lhs, rhs = processed_eq.split('=')
-            lhs = sp.sympify(lhs, locals={**variables, **matrices})
-            rhs = sp.sympify(rhs, locals={**variables, **matrices})
+            lhs, rhs = eq.split('=')
+
+            lhs = sp.sympify(preprocess_expression(lhs.strip()), locals={**variables, **matrices})
+            rhs = sp.sympify(preprocess_expression(rhs.strip()), locals={**variables, **matrices})
+
             sympy_eqs.append(sp.Eq(lhs, rhs))
+
             variables_set.update(lhs.free_symbols)
             variables_set.update(rhs.free_symbols)
+
         solutions = sp.solve(sympy_eqs, list(variables_set))
+
         if solutions:
             cleaned_solutions = {}
-            for var, sol in solutions:
+            for var, sol in solutions.items():
                 cleaned_solutions[str(var)] = clean_multiplication(str(sol))
             return cleaned_solutions
         else:
@@ -541,176 +548,180 @@ def clear_algebraic_structure(structure_name):
     except Exception as e:
         return f"Error in clearing algebraic structure: {e}"
 
-while True:
-    try:
-        user_input = input("Cardano CLI > ")
+def process_commands():
 
-        if user_input.lower() == 'exit':
-            break
-        elif user_input.lower() == 'clear all':
-            print(clear_all())
-        elif user_input.lower().startswith('clear '):
-            name = user_input.split(' ')[1]
-            if name in variables:
-                print(clear_variable(name))
-            elif name in matrices:
-                print(clear_matrix(name))
+    while True:
+        try:
+            user_input = input("Cardano CLI > ")
 
-            elif name in user_sets:
-                print(clear_set(name))
+            if user_input.lower() == 'exit':
+                break
+            elif user_input.lower() == 'clear all':
+                print(clear_all())
+            elif user_input.lower().startswith('clear '):
+                name = user_input.split(' ')[1]
+                if name in variables:
+                    print(clear_variable(name))
+                elif name in matrices:
+                    print(clear_matrix(name))
 
-            elif name in algebraic_structures:
-                print(clear_algebraic_structure(name))
+                elif name in user_sets:
+                    print(clear_set(name))
 
-            else:
-                print(f"{name} does not exist.")
+                elif name in algebraic_structures:
+                    print(clear_algebraic_structure(name))
 
-        elif user_input.lower() == "help":
-            print(get_help())
-
-        elif '=' in user_input and '::' not in user_input and ':=' not in user_input and ':==' not in user_input and "{" and "}" not in user_input:
-            print(solve_equation(user_input))
-        elif '{' in user_input and '}' in user_input and '->' not in user_input and ":" not in user_input and 'set' not in user_input:
-            print(solve_system_of_equations(user_input))
-        elif ':=' in user_input and '{' and '}' not in user_input:
-            print(define_variable(user_input))
-        elif '::' in user_input and ':::' not in user_input:
-            print(define_function(user_input))
-        elif 'det' in user_input:
-            match = re.match(r'det\((\w+)\)', user_input)
-            if match:
-                matrix_name = match.group(1)
-                print(compute_determinant(matrix_name))
-        elif 'inv' in user_input:
-            match = re.match(r'inv\((\w+)\)', user_input)
-            if match:
-                matrix_name = match.group(1)
-                print(compute_inverse(matrix_name))
-        elif 'eigenvals' in user_input:
-            match = re.match(r'eigenvals\((\w+)\)', user_input)
-            if match:
-                matrix_name = match.group(1)
-                print(compute_eigenvalues(matrix_name))
-        elif 'eigenvects' in user_input:
-            match = re.match(r'eigenvects\((\w+)\)', user_input)
-            if match:
-                matrix_name = match.group(1)
-                print(compute_eigenvectors(matrix_name))
-        elif 'transpose' in user_input:
-            match = re.match(r'transpose\((\w+)\)', user_input)
-            if match:
-                matrix_name = match.group(1)
-                print(transpose_matrix(matrix_name))
-        elif 'mul' in user_input:
-            match = re.match(r'mul\((\w+),\s*(\w+)\)', user_input)
-            if match:
-                matrix_name1, matrix_name2 = match.groups()
-                print(multiply_matrices(matrix_name1, matrix_name2))
-        elif 'add' in user_input:
-            match = re.match(r'add\((\w+),\s*(\w+)\)', user_input)
-            if match:
-                matrix_name1, matrix_name2 = match.groups()
-                print(add_matrices(matrix_name1, matrix_name2))
-        elif '{' in user_input and '}' in user_input:
-            matrix_match = re.match(r'(\w+)\s*:=\s*\{\s*([^}]+)\s*\}', user_input)
-            if matrix_match:
-                matrix_name, matrix_str = matrix_match.groups()
-                print(define_matrix(matrix_name, matrix_str))
-            else:
-                set_match = re.match(r'(\w+)\s*:\s*(\{.*\})', user_input)
-                if set_match:
-                    set_name, set_definition = set_match.groups()
-                    print(define_set(set_name, set_definition))
                 else:
-                    print("Invalid input format for set or matrix.")
-        elif 'd/dx' in user_input:
-            match = re.match(r'd/dx\((.*)\)', user_input)
-            if match:
-                expression = match.group(1)
-                print(compute_derivative(expression, 'x'))
-        elif 'dd/ddx' in user_input:
-            match = re.match(r'dd/ddx\((.*),\s*(.*)\)', user_input)
-            if match:
-                expression, var = match.groups()
-                print(compute_partial_derivative(expression, var))
-        elif 'indefinite integral' in user_input:
-            match = re.match(r'indefinite integral\((.*),\s*(.*)\)', user_input)
-            if match:
-                expression, var = match.groups()
-                print(compute_indefinite_integral(expression, var))
-        elif 'definite integral' in user_input:
-            match = re.match(r'definite integral\((.*),\s*(.*),\s*(.*),\s*(.*)\)', user_input)
-            if match:
-                expression, var, a, b = match.groups()
-                print(compute_definite_integral(expression, var, a, b))
-        elif 'derivative' in user_input:
-            match = re.match(r'derivative\((.*),\s*(.*),\s*(\d+)\)', user_input)
-            if match:
-                expression, var, order = match.groups()
-                print(compute_higher_order_derivative(expression, var, int(order)))
+                    print(f"{name} does not exist.")
 
-        elif 'infinite series' in user_input:
-            match = re.match(r'infinite series\((.*),\s*(.*),\s*(.*)\)', user_input)
-            if match:
-                expression, var, n = match.groups()
-                print(compute_infinite_series(expression, var, int(n)))
+            elif user_input.lower() == "help":
+                print(get_help())
 
-        elif 'sum' in user_input and "i" not in user_input:
-            match = re.match(r'sum\((.*),\s*(.*),\s*(.*),\s*(.*)\)', user_input)
-            if match:
-                expression, var, start, end = match.groups()
-                print(compute_large_sum(expression, var, int(start), int(end)))
+            elif '=' in user_input and '::' not in user_input and ':=' not in user_input and ':==' not in user_input and "{" and "}" not in user_input:
+                print(solve_equation(user_input))
+            elif '{' in user_input and '}' in user_input and '->' not in user_input and ":" not in user_input and 'set' not in user_input:
+                print(solve_system_of_equations(user_input))
+            elif ':=' in user_input and '{' and '}' not in user_input:
+                print(define_variable(user_input))
+            elif '::' in user_input and ':::' not in user_input:
+                print(define_function(user_input))
+            elif 'det' in user_input:
+                match = re.match(r'det\((\w+)\)', user_input)
+                if match:
+                    matrix_name = match.group(1)
+                    print(compute_determinant(matrix_name))
+            elif 'inv' in user_input:
+                match = re.match(r'inv\((\w+)\)', user_input)
+                if match:
+                    matrix_name = match.group(1)
+                    print(compute_inverse(matrix_name))
+            elif 'eigenvals' in user_input:
+                match = re.match(r'eigenvals\((\w+)\)', user_input)
+                if match:
+                    matrix_name = match.group(1)
+                    print(compute_eigenvalues(matrix_name))
+            elif 'eigenvects' in user_input:
+                match = re.match(r'eigenvects\((\w+)\)', user_input)
+                if match:
+                    matrix_name = match.group(1)
+                    print(compute_eigenvectors(matrix_name))
+            elif 'transpose' in user_input:
+                match = re.match(r'transpose\((\w+)\)', user_input)
+                if match:
+                    matrix_name = match.group(1)
+                    print(transpose_matrix(matrix_name))
+            elif 'mul' in user_input:
+                match = re.match(r'mul\((\w+),\s*(\w+)\)', user_input)
+                if match:
+                    matrix_name1, matrix_name2 = match.groups()
+                    print(multiply_matrices(matrix_name1, matrix_name2))
+            elif 'add' in user_input:
+                match = re.match(r'add\((\w+),\s*(\w+)\)', user_input)
+                if match:
+                    matrix_name1, matrix_name2 = match.groups()
+                    print(add_matrices(matrix_name1, matrix_name2))
+            elif '{' in user_input and '}' in user_input:
+                matrix_match = re.match(r'(\w+)\s*:=\s*\{\s*([^}]+)\s*\}', user_input)
+                if matrix_match:
+                    matrix_name, matrix_str = matrix_match.groups()
+                    print(define_matrix(matrix_name, matrix_str))
+                else:
+                    set_match = re.match(r'(\w+)\s*:\s*(\{.*\})', user_input)
+                    if set_match:
+                        set_name, set_definition = set_match.groups()
+                        print(define_set(set_name, set_definition))
+                    else:
+                        print("Invalid input format for set or matrix.")
+            elif 'd/dx' in user_input:
+                match = re.match(r'd/dx\((.*)\)', user_input)
+                if match:
+                    expression = match.group(1)
+                    print(compute_derivative(expression, 'x'))
+            elif 'dd/ddx' in user_input:
+                match = re.match(r'dd/ddx\((.*),\s*(.*)\)', user_input)
+                if match:
+                    expression, var = match.groups()
+                    print(compute_partial_derivative(expression, var))
+            elif 'indefinite integral' in user_input:
+                match = re.match(r'indefinite integral\((.*),\s*(.*)\)', user_input)
+                if match:
+                    expression, var = match.groups()
+                    print(compute_indefinite_integral(expression, var))
+            elif 'definite integral' in user_input:
+                match = re.match(r'definite integral\((.*),\s*(.*),\s*(.*),\s*(.*)\)', user_input)
+                if match:
+                    expression, var, a, b = match.groups()
+                    print(compute_definite_integral(expression, var, a, b))
+            elif 'derivative' in user_input:
+                match = re.match(r'derivative\((.*),\s*(.*),\s*(\d+)\)', user_input)
+                if match:
+                    expression, var, order = match.groups()
+                    print(compute_higher_order_derivative(expression, var, int(order)))
 
-        elif 'product' in user_input and "i" not in user_input:
-            match = re.match(r'product\((.*),\s*(.*),\s*(.*),\s*(.*)\)', user_input)
-            if match:
-                expression, var, start, end = match.groups()
-                print(compute_large_product(expression, var, int(start), int(end)))
+            elif 'infinite series' in user_input:
+                match = re.match(r'infinite series\((.*),\s*(.*),\s*(.*)\)', user_input)
+                if match:
+                    expression, var, n = match.groups()
+                    print(compute_infinite_series(expression, var, int(n)))
 
-        elif 'isum' in user_input:
-            match = re.match(r'isum\((.*),\s*(.*),\s*(.*)\)', user_input)
-            if match:
-                expression, var, start = match.groups()
-                print(compute_sum(expression, var, int(start)))
+            elif 'sum' in user_input and "i" not in user_input:
+                match = re.match(r'sum\((.*),\s*(.*),\s*(.*),\s*(.*)\)', user_input)
+                if match:
+                    expression, var, start, end = match.groups()
+                    print(compute_large_sum(expression, var, int(start), int(end)))
 
-        elif 'iproduct' in user_input:
-            match = re.match(r'iproduct\((.*),\s*(.*),\s*(.*)\)', user_input)
-            if match:
-                expression, var, start = match.groups()
-                print(compute_product(expression, var, int(start)))
+            elif 'product' in user_input and "i" not in user_input:
+                match = re.match(r'product\((.*),\s*(.*),\s*(.*),\s*(.*)\)', user_input)
+                if match:
+                    expression, var, start, end = match.groups()
+                    print(compute_large_product(expression, var, int(start), int(end)))
 
-        elif user_input in number_sets:
-            print(number_sets[user_input])
+            elif 'isum' in user_input:
+                match = re.match(r'isum\((.*),\s*(.*),\s*(.*)\)', user_input)
+                if match:
+                    expression, var, start = match.groups()
+                    print(compute_sum(expression, var, int(start)))
 
-        # Checking if the input is a defined set name
-        elif user_input in user_sets:
-            print(f"{user_input} = {user_sets[user_input]}")
+            elif 'iproduct' in user_input:
+                match = re.match(r'iproduct\((.*),\s*(.*),\s*(.*)\)', user_input)
+                if match:
+                    expression, var, start = match.groups()
+                    print(compute_product(expression, var, int(start)))
 
-        elif user_input in algebraic_structures:
-            print(f"{user_input} = {algebraic_structures[user_input]}")
+            elif user_input in number_sets:
+                print(number_sets[user_input])
 
-        elif "group" in user_input:
-            match = re.match(r'(group)\s*([A-Za-z])\s*\((.*)\)', user_input)
-            if match:
-                print(define_algebraic_structure("group", match.group(2), match.group(3)))
+            # Checking if the input is a defined set name
+            elif user_input in user_sets:
+                print(f"{user_input} = {user_sets[user_input]}")
 
-        elif "field" in user_input:
-            match = re.match(r'(field)\s*([A-Za-z])\s*\((.*)\)', user_input)
-            if match:
-                print(define_algebraic_structure("field", match.group(2), match.group(3)))
+            elif user_input in algebraic_structures:
+                print(f"{user_input} = {algebraic_structures[user_input]}")
 
-        elif "ring" in user_input:
-            match = re.match(r'(ring)\s*([A-Za-z])\s*\((.*)\)', user_input)
-            if match:
-                print(define_algebraic_structure("ring", match.group(2), match.group(3)))
+            elif "group" in user_input:
+                match = re.match(r'(group)\s*([A-Za-z])\s*\((.*)\)', user_input)
+                if match:
+                    print(define_algebraic_structure("group", match.group(2), match.group(3)))
 
-        elif "monoid" in user_input:
-            match = re.match(r'(monoid)\s*([A-Za-z])\s*\((.*)\)', user_input)
-            if match:
-                print(define_algebraic_structure("monoid", match.group(2), match.group(3)))
+            elif "field" in user_input:
+                match = re.match(r'(field)\s*([A-Za-z])\s*\((.*)\)', user_input)
+                if match:
+                    print(define_algebraic_structure("field", match.group(2), match.group(3)))
 
-        else:
-            print(evaluate_expression(user_input))
+            elif "ring" in user_input:
+                match = re.match(r'(ring)\s*([A-Za-z])\s*\((.*)\)', user_input)
+                if match:
+                    print(define_algebraic_structure("ring", match.group(2), match.group(3)))
 
-    except Exception as e:
-        print(f"Error in main loop: {e}")
+            elif "monoid" in user_input:
+                match = re.match(r'(monoid)\s*([A-Za-z])\s*\((.*)\)', user_input)
+                if match:
+                    print(define_algebraic_structure("monoid", match.group(2), match.group(3)))
+            
+            else:
+                print(evaluate_expression(user_input))
+
+        except Exception as e:
+            print(f"Error in main loop: {e}")
+
+process_commands()
