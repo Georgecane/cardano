@@ -22,6 +22,7 @@ number_sets = {
 }
 
 def preprocess_expression(expression):
+    
     processed_expression = expression.replace('**', '^')
     processed_expression = re.sub(r'(\d)([a-zA-Z])', r'\1*\2', processed_expression)
     processed_expression = re.sub(r'([a-zA-Z])(\d)', r'\1*\2', processed_expression)
@@ -56,6 +57,7 @@ def preprocess_expression(expression):
     processed_expression = processed_expression.replace('ħ', '1.054571628 * 10 ^ -34')
     processed_expression = processed_expression.replace('Na', '6.02214076 * 10 ^ 23')
     processed_expression = processed_expression.replace('C_0', '300000000')
+    processed_expression = processed_expression.replace('r_number', '0.6172839455060657')
 
     return processed_expression
 
@@ -577,7 +579,7 @@ def process_commands():
             elif user_input.lower() == "help":
                 print(get_help())
 
-            elif '=' in user_input and '::' not in user_input and ':=' not in user_input and ':==' not in user_input and "{" and "}" not in user_input:
+            elif '=' in user_input and '::' not in user_input and ':=' not in user_input and ':==' not in user_input and "{" and "}" not in user_input and 'diff' not in user_input:
                 print(solve_equation(user_input))
             elif '{' in user_input and '}' in user_input and '->' not in user_input and ":" not in user_input and 'set' not in user_input:
                 print(solve_system_of_equations(user_input))
