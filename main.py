@@ -1,7 +1,5 @@
 import sympy as sp
 import re
-import os
-import platform
 from decimal import Decimal, getcontext
 import math
 
