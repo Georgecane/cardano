@@ -1304,30 +1304,32 @@ def detect_and_solve_equation(equation, conditions=None):
                     right = right.strip()
                     
                     if '(' in left:
-                        func_name = variables['dependent']
-                        point = float(left[left.index('(')+1:left.index(')')])
-                        value = float(right)
+                        # Handle multi-variable conditions like y(x,0) = -x
+                        func_name = left[:left.index('(')]
+                        point_str = left[left.index('(')+1:left.index(')')]
+                        points = [p.strip() for p in point_str.split(',')]
+                        
                         parsed_conditions.append({
                             'type': 'value',
-                            'point': point,
-                            'value': value
+                            'points': points,
+                            'value': right
                         })
                     elif "'" in left:
                         order = left.count("'")
                         point = 0
-                        value = float(right)
                         parsed_conditions.append({
                             'type': 'derivative',
                             'order': order,
                             'point': point,
-                            'value': value
+                            'value': float(right)
                         })
         
-        # Convert to ODE if only one independent variable
-        if eq_type == 'pde' and len(variables['independent']) == 1:
-            eq_type = 'ode'
-            variables['independent'] = list(variables['independent'])[0]
-        
+        # Force PDE if multiple variables detected in derivatives or conditions
+        if any(',' in str(cond.get('points', '')) for cond in parsed_conditions):
+            eq_type = 'pde'
+        elif variables['derivatives'] and len(set(d[1] for d in variables['derivatives'])) > 1:
+            eq_type = 'pde'
+            
         # Solve based on type
         if eq_type == 'pde':
             return solve_pde(lhs, rhs, variables, parsed_conditions)
@@ -1355,10 +1357,6 @@ def analyze_equation(equation):
         derivatives = re.findall(r'd([a-zA-Z][a-zA-Z0-9]*)/d([a-zA-Z][a-zA-Z0-9]*)', eq)
         primed = re.findall(r'([a-zA-Z][a-zA-Z0-9]*)[\'"]+', eq)
         
-        # Find function calls
-        functions = re.findall(r'([a-zA-Z][a-zA-Z0-9]*)\([^)]+\)', eq)
-        variables['functions'].update(functions)
-        
         if derivatives:
             # Get variables from derivatives
             dep_vars = {d[0] for d in derivatives}
@@ -1368,7 +1366,7 @@ def analyze_equation(equation):
             variables['independent'] = indep_vars
             variables['derivatives'] = derivatives
             
-            # It's only a PDE if we have multiple DIFFERENT independent variables
+            # It's a PDE only if we have multiple DIFFERENT independent variables
             return ('pde' if len(indep_vars) > 1 else 'ode', variables)
             
         elif primed:
@@ -1380,7 +1378,7 @@ def analyze_equation(equation):
             
         else:
             # Default case
-            all_vars = list(set(re.findall(r'[a-zA-Z][a-zA-Z0-9]*', eq)) - {'d'} - variables['functions'])
+            all_vars = list(set(re.findall(r'[a-zA-Z][a-zA-Z0-9]*', eq)) - {'d'})
             if all_vars:
                 variables['dependent'] = all_vars[0]
                 variables['independent'] = {all_vars[1]} if len(all_vars) > 1 else {'x'}
@@ -1396,15 +1394,13 @@ def solve_ode(lhs, rhs, variables, conditions=None):
     """Solve ordinary differential equations with conditions"""
     try:
         # Create symbols
-        x = sp.Symbol(list(variables['independent'])[0] if isinstance(variables['independent'], set) 
-                     else variables['independent'])
+        x = sp.Symbol(list(variables['independent'])[0])
         y = sp.Function(variables['dependent'])
         
         # Process equation
         expr = lhs
         dep_var = variables['dependent']
-        indep_var = list(variables['independent'])[0] if isinstance(variables['independent'], set) \
-                   else variables['independent']
+        indep_var = list(variables['independent'])[0]
         
         # Create local dictionary
         local_dict = {
@@ -1426,17 +1422,14 @@ def solve_ode(lhs, rhs, variables, conditions=None):
         rhs_expr = sp.sympify(rhs, locals=local_dict)
         eq = sp.Eq(lhs_expr, rhs_expr)
         
-        # Prepare initial conditions
-        ics = {}
+        # Solve ODE
         if conditions:
+            ics = {}
             for cond in conditions:
                 if cond['type'] == 'value':
                     ics[y(cond['point'])] = cond['value']
                 elif cond['type'] == 'derivative':
                     ics[sp.Derivative(y(x), x, cond['order']).subs(x, cond['point'])] = cond['value']
-        
-        # Solve ODE
-        if ics:
             solution = sp.dsolve(eq, y(x), ics=ics)
         else:
             solution = sp.dsolve(eq, y(x))
@@ -1450,32 +1443,31 @@ def solve_pde(lhs, rhs, variables, conditions=None):
     """Solve partial differential equations with conditions"""
     try:
         # Create symbols for all independent variables
-        t, x = sp.symbols('t x')
-        u = sp.Function('u')
+        var_symbols = {var: sp.Symbol(var) for var in variables['independent']}
+        dep_var = variables['dependent']
+        u = sp.Function(dep_var)  # Use the actual dependent variable name
         F = sp.Function('F')  # Arbitrary function
         
-        # Process equation
-        expr = lhs
-        dep_var = variables['dependent']
-        
-        # Create local dictionary
+        # Create local dictionary with all symbols
         local_dict = {
-            't': t,
-            'x': x,
+            **var_symbols,  # All independent variables
             dep_var: u,
             'F': F
         }
+        
+        # Process equation
+        expr = lhs
         
         # Replace partial derivatives
         for d_var, i_var in variables['derivatives']:
             expr = expr.replace(
                 f'd{d_var}/d{i_var}', 
-                str(sp.Derivative(u(t, x), locals()[i_var]))
+                str(sp.Derivative(u(*var_symbols.values()), var_symbols[i_var]))
             )
         
         # Replace function calls
         pattern = rf'\b{dep_var}\b(?!\()'
-        expr = re.sub(pattern, f'{dep_var}(t,x)', expr)
+        expr = re.sub(pattern, f'{dep_var}({",".join(var_symbols.keys())})', expr)
         
         # Create equation
         lhs_expr = sp.sympify(expr, locals=local_dict)
@@ -1483,39 +1475,59 @@ def solve_pde(lhs, rhs, variables, conditions=None):
         eq = sp.Eq(lhs_expr, rhs_expr)
         
         # Get general solution
-        general = sp.pdsolve(eq, u(t,x))
+        general = sp.pdsolve(eq, u(*var_symbols.values()))
         
         # If we have conditions, solve for F
         if conditions:
-            # Convert general solution to usable form
-            general_rhs = general.rhs
-            
-            # Create system of equations from conditions
-            system = []
+            # Process all conditions
+            condition_eqs = []
             for cond in conditions:
                 if cond['type'] == 'value':
-                    t_val, x_val = [float(p) for p in str(cond['point']).split(',')]
-                    value = cond['value']
-                    
-                    # Substitute point values into general solution
-                    eq = sp.Eq(general_rhs.subs({t: t_val, x: x_val}), value)
-                    system.append(eq)
+                    try:
+                        # Parse condition points and value
+                        if isinstance(cond['points'], list):
+                            # Full point specification y(x,t) = value
+                            points = {var: sp.sympify(val, locals=local_dict) 
+                                    for var, val in zip(var_symbols.keys(), cond['points'])}
+                        else:
+                            # Single variable specification y(x) = f(t) or y(t) = f(x)
+                            var = cond['points']
+                            other_vars = set(var_symbols.keys()) - {var}
+                            points = {v: var_symbols[v] for v in other_vars}
+                            points[var] = 0  # Set specified variable to 0
+                            
+                        # Parse value expression
+                        value_expr = sp.sympify(cond['value'], locals=local_dict)
+                        
+                        # Create condition equation
+                        cond_eq = sp.Eq(general.rhs.subs(points), value_expr)
+                        condition_eqs.append((cond_eq, points, value_expr))
+                        
+                    except Exception as e:
+                        print(f"Warning: Could not process condition: {e}")
             
-            if system:
-                # Try to solve for F
+            # Try to solve the system of conditions
+            if condition_eqs:
                 try:
-                    # Get the argument of F
-                    f_arg = next(arg for arg in general_rhs.find(F) if isinstance(arg, sp.Function))
-                    arg_expr = f_arg.args[0]
+                    # Get characteristic variable
+                    char_var = next(arg for arg in general.rhs.find(F) 
+                                  if isinstance(arg, sp.Function)).args[0]
                     
-                    # Create F value based on conditions
-                    f_value = value - (general_rhs - F(arg_expr)).subs({t: t_val, x: x_val})
+                    # Use all conditions to determine F
+                    particular = general.rhs
+                    for cond_eq, points, value_expr in condition_eqs:
+                        char_val = char_var.subs(points)
+                        
+                        # Update particular solution
+                        particular = particular.subs(
+                            F(char_var),
+                            value_expr + F(char_var) - F(char_val)
+                        )
                     
-                    # Substitute back into general solution
-                    particular = general_rhs.subs(F(arg_expr), f_value)
-                    return f"PDE Solution: {sp.Eq(u(t,x), particular)}"
+                    return f"PDE Solution: Eq({dep_var}({','.join(var_symbols.keys())}), {particular})"
+                    
                 except Exception as e:
-                    return f"PDE Solution (with conditions): {general}"
+                    print(f"Warning: Could not solve for particular solution: {e}")
         
         return f"PDE Solution: {general}"
         
