@@ -1447,11 +1447,12 @@ def solve_ode(lhs, rhs, variables, conditions=None):
         return f"Error in solve_ode: {str(e)}\nEquation parsed as: {expr}"
 
 def solve_pde(lhs, rhs, variables, conditions=None):
-    """Solve partial differential equations"""
+    """Solve partial differential equations with conditions"""
     try:
         # Create symbols for all independent variables
-        symbols = {var: sp.Symbol(var) for var in variables['independent']}
-        f = sp.Function(variables['dependent'])
+        t, x = sp.symbols('t x')
+        u = sp.Function('u')
+        F = sp.Function('F')  # Arbitrary function
         
         # Process equation
         expr = lhs
@@ -1459,50 +1460,66 @@ def solve_pde(lhs, rhs, variables, conditions=None):
         
         # Create local dictionary
         local_dict = {
-            **symbols,  # Add all independent variables
-            dep_var: f
+            't': t,
+            'x': x,
+            dep_var: u,
+            'F': F
         }
         
         # Replace partial derivatives
         for d_var, i_var in variables['derivatives']:
             expr = expr.replace(
                 f'd{d_var}/d{i_var}', 
-                str(sp.Derivative(f(*symbols.values()), symbols[i_var]))
+                str(sp.Derivative(u(t, x), locals()[i_var]))
             )
         
         # Replace function calls
         pattern = rf'\b{dep_var}\b(?!\()'
-        expr = re.sub(pattern, f'{dep_var}({",".join(symbols.keys())})', expr)
+        expr = re.sub(pattern, f'{dep_var}(t,x)', expr)
         
         # Create equation
         lhs_expr = sp.sympify(expr, locals=local_dict)
         rhs_expr = sp.sympify(rhs, locals=local_dict)
         eq = sp.Eq(lhs_expr, rhs_expr)
         
-        # Solve PDE
+        # Get general solution
+        general = sp.pdsolve(eq, u(t,x))
+        
+        # If we have conditions, solve for F
         if conditions:
-            # Handle boundary/initial conditions for PDE
-            solution = sp.pdsolve(eq, f(*symbols.values()), ics=conditions)
-        else:
-            solution = sp.pdsolve(eq, f(*symbols.values()))
+            # Convert general solution to usable form
+            general_rhs = general.rhs
             
-        return f"PDE Solution: {solution}"
+            # Create system of equations from conditions
+            system = []
+            for cond in conditions:
+                if cond['type'] == 'value':
+                    t_val, x_val = [float(p) for p in str(cond['point']).split(',')]
+                    value = cond['value']
+                    
+                    # Substitute point values into general solution
+                    eq = sp.Eq(general_rhs.subs({t: t_val, x: x_val}), value)
+                    system.append(eq)
+            
+            if system:
+                # Try to solve for F
+                try:
+                    # Get the argument of F
+                    f_arg = next(arg for arg in general_rhs.find(F) if isinstance(arg, sp.Function))
+                    arg_expr = f_arg.args[0]
+                    
+                    # Create F value based on conditions
+                    f_value = value - (general_rhs - F(arg_expr)).subs({t: t_val, x: x_val})
+                    
+                    # Substitute back into general solution
+                    particular = general_rhs.subs(F(arg_expr), f_value)
+                    return f"PDE Solution: {sp.Eq(u(t,x), particular)}"
+                except Exception as e:
+                    return f"PDE Solution (with conditions): {general}"
+        
+        return f"PDE Solution: {general}"
         
     except Exception as e:
         return f"Error in solve_pde: {str(e)}\nEquation parsed as: {expr}"
-
-def classify_pde(equation):
-    """Classify the type of PDE"""
-    try:
-        if 'd²u/dx²' in equation or 'd²u/dy²' in equation:
-            if 'du/dt' in equation:
-                return "Parabolic"  # Heat equation type
-            elif 'd²u/dt²' in equation:
-                return "Hyperbolic"  # Wave equation type
-            else:
-                return "Elliptic"   # Laplace equation type
-        return "First-order PDE"
-    except Exception as e:
-        return f"Error in classify_pde: {e}"
     
 process_commands()
