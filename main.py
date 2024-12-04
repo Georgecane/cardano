@@ -73,7 +73,7 @@ def preprocess_expression(expression):
     processed_expression = processed_expression.replace('Na', '6.02214076 * 10 ^ 23')
     processed_expression = processed_expression.replace('C_0', '300000000')
     processed_expression = processed_expression.replace('r_number', '0.6172839455060657')
-
+    processed_expression = processed_expression.replace('I', 'sp.I')
     return processed_expression
 
 def compute_derivative(expression, var):
