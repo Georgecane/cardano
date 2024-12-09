@@ -955,6 +955,13 @@ def process_commands():
                 else:  # Variable definition
                     print(define_variable(name.strip(), expr.strip()))
                     
+                    
+            elif 'root' in user_input:
+                match = re.match(r'root\((.*),\s*(\w+)\)', user_input)
+                if match:
+                    expression, variable = match.groups()
+                    print(compute_roots(expression, variable))
+            
             # Default expression evaluation
             else:
                 print(evaluate_expression(user_input))
@@ -1534,4 +1541,21 @@ def solve_pde(lhs, rhs, variables, conditions=None):
     except Exception as e:
         return f"Error in solve_pde: {str(e)}\nEquation parsed as: {expr}"
     
+def compute_roots(expression, variable):
+    try:
+        processed_expression = preprocess_expression(expression)
+        var_symbol = sp.Symbol(variable)
+        expr = sp.sympify(processed_expression, locals={**variables, **functions})
+
+        solutions = sp.solve(expr, var_symbol)
+        
+        if solutions:
+            cleaned_solutions = [clean_multiplication(str(sol)) for sol in solutions]
+            return f"Roots: {', '.join(cleaned_solutions)}"
+        else:
+            return "No roots found."
+    
+    except Exception as e:
+        return f"Error in compute_roots: {e}"
+
 process_commands()
