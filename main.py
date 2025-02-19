@@ -4,6 +4,7 @@ from decimal import Decimal, getcontext
 import math
 from itertools import permutations
 import os
+import pycfd.symbolicly.symbolic_regression as sre
 
 getcontext().prec = 30
 
@@ -36,7 +37,7 @@ def clear_screen():
         return f"Error clearing screen: {e}"
 
 def preprocess_expression(expression):
-    
+
     processed_expression = expression.replace('**', '^')
     processed_expression = re.sub(r'(\d)([a-zA-Z])', r'\1*\2', processed_expression)
     processed_expression = re.sub(r'([a-zA-Z])(\d)', r'\1*\2', processed_expression)
@@ -113,13 +114,13 @@ def clean_multiplication(expression):
 def evaluate_expression(expression):
     try:
         processed_expression = preprocess_expression(expression)
-        
+
         if 'compute_nroot' in processed_expression:
             match = re.match(r'compute_nroot\(([^,]+),\s*([^)]+)\)', processed_expression)
             if match:
                 n, k = match.groups()
                 return compute_nroot(float(n), float(k))
-        
+
         eval_dict = {
             'sp': sp, 'Decimal': Decimal, 'compute_nroot': compute_nroot,
             'compute_determinant': compute_determinant, 'compute_inverse': compute_inverse,
@@ -161,24 +162,24 @@ def solve_equation(equation):
     try:
         # Split equation into left and right sides
         left_side, right_side = equation.split('=')
-        
+
         # Process both sides
         left_expr = preprocess_expression(left_side)
         right_expr = preprocess_expression(right_side)
-        
+
         # Convert to SymPy expressions
         left = sp.sympify(left_expr)
         right = sp.sympify(right_expr)
-        
+
         # Move everything to left side
         equation = left - right
-        
+
         # Find all symbols in equation
         symbols = list(equation.free_symbols)
-        
+
         if not symbols:
             return "No variables to solve for"
-            
+
         # Solve equation
         solution = sp.solve(equation, symbols[0])
         return f"{symbols[0]} = {solution}"
@@ -191,36 +192,36 @@ def solve_system_of_equations(equations):
         # Clean and process each equation
         processed_equations = []
         variables = set()
-        
+
         for eq in equations:
             # Strip whitespace and ensure equation format
             eq = eq.strip()
             if '=' not in eq:
                 eq += '= 0'
-                
+
             # Split into LHS and RHS
             lhs, rhs = eq.split('=')
             lhs = lhs.strip()
             rhs = rhs.strip()
-            
+
             # Convert to standard form (all terms on LHS)
             expr = f"{lhs}-({rhs})"
             processed_equations.append(expr)
-            
+
             # Collect variables
             for var in ['x', 'y', 'z']:  # Add more variables if needed
                 if var in eq:
                     variables.add(var)
-        
+
         # Convert variables to SymPy symbols
         symbols = [sp.Symbol(var) for var in sorted(variables)]
-        
+
         # Convert equations to SymPy expressions
         sympy_equations = [sp.sympify(eq) for eq in processed_equations]
-        
+
         # Solve the system
         solution = sp.solve(sympy_equations, symbols)
-        
+
         # Format the solution
         if isinstance(solution, dict):
             return ", ".join([f"{var} = {val}" for var, val in solution.items()])
@@ -228,7 +229,7 @@ def solve_system_of_equations(equations):
             return ", ".join([f"{symbols[i]} = {val}" for i, val in enumerate(solution)])
         else:
             return str(solution)
-            
+
     except Exception as e:
         return f"Error solving system: {e}"
 
@@ -594,7 +595,7 @@ def define_algebraic_structure(structure_type, name, elements_str):
         elements = set()
         operations = {}
         properties = {}
-        
+
         for param in params:
             if param.startswith('elements='):
                 elements_part = param[9:].strip('{}')
@@ -610,7 +611,7 @@ def define_algebraic_structure(structure_type, name, elements_str):
             elif param.startswith('inverse='):
                 inv_part = param[8:].strip('{}')
                 properties['inverse'] = eval('{' + inv_part + '}')
-                
+
         # Validate structure based on type
         if structure_type == 'group':
             if not validate_group(elements, operations.get('*', {}), properties):
@@ -618,7 +619,7 @@ def define_algebraic_structure(structure_type, name, elements_str):
         elif structure_type == 'ring':
             if not validate_ring(elements, operations, properties):
                 return "Invalid ring structure"
-                
+
         algebraic_structures[name] = {
             'type': structure_type,
             'elements': elements,
@@ -634,9 +635,9 @@ def algebraic_operation(name, op, name2=None):
     try:
         if name not in algebraic_structures:
             return "Structure not found"
-            
+
         structure = algebraic_structures[name]
-        
+
         if op == 'order':
             return len(structure['elements'])
         elif op == 'center':
@@ -653,7 +654,7 @@ def algebraic_operation(name, op, name2=None):
             if name2 not in algebraic_structures:
                 return "Second structure not found"
             return compute_direct_product(structure, algebraic_structures[name2])
-            
+
         return f"Unknown operation {op}"
     except Exception as e:
         return f"Error in algebraic operation: {e}"
@@ -664,7 +665,7 @@ def compute_center(structure):
         elements = structure['elements']
         operation = structure['operations'].get('*', {})
         center = set()
-        
+
         for a in elements:
             is_central = True
             for b in elements:
@@ -673,7 +674,7 @@ def compute_center(structure):
                     break
             if is_central:
                 center.add(a)
-                
+
         return f"Center: {center}"
     except Exception as e:
         return f"Error computing center: {e}"
@@ -683,7 +684,7 @@ def is_cyclic_structure(structure):
     try:
         elements = structure['elements']
         operation = structure['operations'].get('*', {})
-        
+
         for a in elements:
             generated = {a}
             current = a
@@ -694,7 +695,7 @@ def is_cyclic_structure(structure):
                 generated.add(current)
             if generated == elements:
                 return f"Structure is cyclic. Generator: {a}"
-                
+
         return "Structure is not cyclic"
     except Exception as e:
         return f"Error checking cyclicity: {e}"
@@ -705,7 +706,7 @@ def find_generators(structure):
         elements = structure['elements']
         operation = structure['operations'].get('*', {})
         generators = set()
-        
+
         for a in elements:
             generated = {a}
             current = a
@@ -718,7 +719,7 @@ def find_generators(structure):
                 power += 1
             if generated == elements:
                 generators.add(a)
-                
+
         return f"Generators: {generators}"
     except Exception as e:
         return f"Error finding generators: {e}"
@@ -728,14 +729,14 @@ def compute_quotient(structure1, structure2):
     try:
         cosets = compute_cosets(structure1, structure2)
         operation = structure1['operations'].get('*', {})
-        
+
         # Define operation on cosets
         quotient_operation = {}
         for coset1 in cosets:
             quotient_operation[coset1] = {}
             for coset2 in cosets:
                 quotient_operation[coset1][coset2] = operate_cosets(coset1, coset2, structure1)
-                
+
         return quotient_operation
     except Exception as e:
         return f"Error computing quotient: {e}"
@@ -747,17 +748,17 @@ def compute_direct_product(structure1, structure2):
         elements2 = structure2['elements']
         op1 = structure1['operations'].get('*', {})
         op2 = structure2['operations'].get('*', {})
-        
+
         # Create product elements
         product_elements = {(a, b) for a in elements1 for b in elements2}
-        
+
         # Define operation on product
         product_operation = {}
         for (a1, b1) in product_elements:
             product_operation[(a1, b1)] = {}
             for (a2, b2) in product_elements:
                 product_operation[(a1, b1)][(a2, b2)] = (op1[a1][a2], op2[b1][b2])
-                
+
         return {
             'elements': product_elements,
             'operations': {'*': product_operation}
@@ -770,7 +771,7 @@ def is_normal_substructure(sub, structure):
     try:
         elements = structure['elements']
         operation = structure['operations'].get('*', {})
-        
+
         for n in sub['elements']:
             for g in elements:
                 conjugate = operation[operation[g][n]][inverse(g, structure)]
@@ -780,195 +781,6 @@ def is_normal_substructure(sub, structure):
     except Exception:
         return False
 
-def process_commands():
-    while True:
-        try:
-            user_input = input("Cardano CLI > ")
-            
-            # Basic commands
-            if user_input.lower() == 'exit':
-                break
-            elif user_input.lower() == 'cls':
-                print(clear_screen())
-            elif user_input.lower() == 'help':
-                print(get_help())
-            elif user_input.lower() == 'clear all':
-                print(clear_all())
-                
-            # Clear specific objects
-            elif user_input.lower().startswith('clear '):
-                name = user_input.split(' ')[1]
-                if name in variables:
-                    print(clear_variable(name))
-                elif name in matrices:
-                    print(clear_matrix(name))
-                elif name in user_sets:
-                    print(clear_set(name))
-                elif name in algebraic_structures:
-                    print(clear_algebraic_structure(name))
-                elif name in tensors:
-                    print(clear_tensor(name))
-                else:
-                    print(f"{name} not found.")
-                    
-            # Matrix operations
-            elif user_input.startswith('det('):
-                matrix_name = user_input[4:-1]
-                print(compute_determinant(matrix_name))
-            elif user_input.startswith('inv('):
-                matrix_name = user_input[4:-1]
-                print(compute_inverse(matrix_name))
-            elif user_input.startswith('eigenvals('):
-                matrix_name = user_input[10:-1]
-                print(compute_eigenvalues(matrix_name))
-            elif user_input.startswith('eigenvects('):
-                matrix_name = user_input[11:-1]
-                print(compute_eigenvectors(matrix_name))
-            elif user_input.startswith('transpose('):
-                matrix_name = user_input[10:-1]
-                print(transpose_matrix(matrix_name))
-            elif user_input.startswith('mul('):
-                matrices = user_input[4:-1].split(',')
-                print(multiply_matrices(matrices[0].strip(), matrices[1].strip()))
-            elif user_input.startswith('add('):
-                matrices = user_input[4:-1].split(',')
-                print(add_matrices(matrices[0].strip(), matrices[1].strip()))
-                
-            # Differential equations
-            elif user_input.startswith('solve ode ') or user_input.startswith('solve pde '):
-               parts = user_input.split(',')
-               equation = parts[0].replace('solve ode ', '').replace('solve pde ', '').strip()
-               conditions = [cond.strip() for cond in parts[1:]] if len(parts) > 1 else None
-               print(detect_and_solve_equation(equation, conditions))
-                
-            # Calculus operations
-            elif user_input.startswith('d/dx('):
-                expr = user_input[5:-1]
-                print(compute_derivative(expr, 'x'))
-            elif user_input.startswith('dd/ddx('):
-                parts = user_input[7:-1].split(',')
-                print(compute_partial_derivative(parts[0], parts[1]))
-            elif user_input.startswith('indefinite integral('):
-                parts = user_input[19:-1].split(',')
-                print(compute_indefinite_integral(parts[0], parts[1]))
-            elif user_input.startswith('definite integral('):
-                parts = user_input[17:-1].split(',')
-                print(compute_definite_integral(parts[0], parts[1], parts[2], parts[3]))
-            elif user_input.startswith('derivative('):
-                parts = user_input[11:-1].split(',')
-                print(compute_higher_order_derivative(parts[0], parts[1], int(parts[2])))
-                
-            # Series and sums
-            elif user_input.startswith('series('):
-                parts = user_input[7:-1].split(',')
-                print(compute_infinite_series(parts[0], parts[1], int(parts[2])))
-            elif user_input.startswith('sum('):
-                parts = user_input[4:-1].split(',')
-                print(compute_large_sum(parts[0], parts[1], int(parts[2]), int(parts[3])))
-            elif user_input.startswith('product('):
-                parts = user_input[8:-1].split(',')
-                print(compute_large_product(parts[0], parts[1], int(parts[2]), int(parts[3])))
-            elif user_input.startswith('isum('):
-                parts = user_input[5:-1].split(',')
-                print(compute_sum(parts[0].strip(), parts[1].strip(), int(parts[2].strip())))
-            elif user_input.startswith('iproduct('):
-                parts = user_input[9:-1].split(',')
-                print(compute_product(parts[0].strip(), parts[1].strip(), int(parts[2].strip())))
-                
-            # Algebraic structures and operations
-            elif user_input.startswith('center '):
-                name = user_input.split()[1]
-                print(compute_center(algebraic_structures.get(name)))
-            elif user_input.startswith('generators '):
-                name = user_input.split()[1]
-                print(find_generators(algebraic_structures.get(name)))
-            elif user_input.startswith('is_cyclic '):
-                name = user_input.split()[1]
-                print(is_cyclic_structure(algebraic_structures.get(name)))
-            elif user_input.startswith('quotient '):
-                name1, name2 = user_input.split()[1:]
-                print(algebraic_operation(name1, 'quotient', name2))
-            elif user_input.startswith('direct_product '):
-                name1, name2 = user_input.split()[1:]
-                print(algebraic_operation(name1, 'direct_product', name2))
-            elif user_input.startswith('convert_matrix '):
-                name = user_input.split()[1]
-                print(convert_algebraic_to_matrix(name))
-            elif user_input.startswith('tensor_product '):
-                tensor_name, structure_name = user_input.split()[1:]
-                print(tensor_structure_product(tensor_name, structure_name))
-            elif user_input.startswith('homomorphism '):
-                structure_name, func_name = user_input.split()[1:]
-                print(structure_homomorphism(structure_name, func_name))
-                
-            # Set operations and definitions
-            elif ':=' in user_input and '{' in user_input:
-                name, set_def = user_input.split(':=')
-                if 'tensor' in set_def.lower():
-                    pattern = r'tensor\s*\{([^}]+)\}\s*rank\s*(\d+)'
-                    match = re.match(pattern, set_def.strip())
-                    if match:
-                        components, rank = match.groups()
-                        print(define_tensor(name.strip(), components, int(rank)))
-                else:
-                    print(define_set(name.strip(), set_def.strip()))
-                    
-            # Function definitions
-            elif '::' in user_input:
-                print(define_function(user_input))
-                
-            # Algebraic structure definitions
-            elif any(s in user_input for s in ['group', 'ring', 'field', 'monoid']):
-                structure_type = next(s for s in ['group', 'ring', 'field', 'monoid'] 
-                                   if s in user_input)
-                match = re.match(
-                    f'({structure_type})\s+([A-Za-z][A-Za-z0-9]*)\s+(.*)', 
-                    user_input, 
-                    re.IGNORECASE
-                )
-                if match:
-                    _, name, params = match.groups()
-                    print(define_algebraic_structure(structure_type, name, params))
-                    
-            # Root computation
-            elif user_input.startswith('nroot('):
-                parts = user_input[6:-1].split(',')
-                print(compute_nroot(parts[0].strip(), parts[1].strip()))
-                
-            # Equation solving
-            elif '=' in user_input and 'solve' not in user_input:
-                print(solve_equation(user_input))
-                
-            # System of equations
-            elif user_input.startswith('solve '):
-                equations = [eq.strip() for eq in user_input[6:].split(',')]
-                if len(equations) > 1:
-                    print(solve_system_of_equations(equations))
-                else:
-                    print(solve_equation(equations[0]))
-                    
-            # Variable assignments
-            elif ':=' in user_input and '::' not in user_input:
-                name, expr = user_input.split(':=')
-                if '{' in expr and '}' in expr:  # Matrix definition
-                    print(define_matrix(name.strip(), expr.strip()))
-                else:  # Variable definition
-                    print(define_variable(name.strip(), expr.strip()))
-                    
-                    
-            elif 'root' in user_input:
-                match = re.match(r'root\((.*),\s*(\w+)\)', user_input)
-                if match:
-                    expression, variable = match.groups()
-                    print(compute_roots(expression, variable))
-            
-            # Default expression evaluation
-            else:
-                print(evaluate_expression(user_input))
-                
-        except Exception as e:
-            print(f"Error in command processing: {e}")
-
 def compute_cosets(structure1, structure2):
     """Compute cosets for quotient structures"""
     try:
@@ -976,11 +788,11 @@ def compute_cosets(structure1, structure2):
         subgroup_elements = structure2['elements']
         operation = structure1['operations'].get('*', {})
         cosets = set()
-        
+
         for g in elements:
             coset = frozenset(operation[g][h] for h in subgroup_elements)
             cosets.add(coset)
-            
+
         return cosets
     except Exception as e:
         return f"Error computing cosets: {e}"
@@ -990,11 +802,11 @@ def operate_cosets(coset1, coset2, structure):
     try:
         operation = structure['operations'].get('*', {})
         result = set()
-        
+
         for a in coset1:
             for b in coset2:
                 result.add(operation[a][b])
-                
+
         return frozenset(result)
     except Exception as e:
         return f"Error operating on cosets: {e}"
@@ -1029,7 +841,7 @@ def validate_ring(elements, operations, properties):
         add_op = operations.get('+', {})
         if not validate_group(elements, add_op, properties):
             return False
-            
+
         # Check multiplication closure and associativity
         mul_op = operations.get('*', {})
         for a in elements:
@@ -1039,7 +851,7 @@ def validate_ring(elements, operations, properties):
                 for c in elements:
                     if mul_op[mul_op[a][b]][c] != mul_op[a][mul_op[b][c]]:
                         return False
-                        
+
         # Check distributivity
         for a in elements:
             for b in elements:
@@ -1054,7 +866,7 @@ def validate_ring(elements, operations, properties):
                     right_dist = add_op[mul_op[b][a]][mul_op[c][a]]
                     if left_dist != right_dist:
                         return False
-                        
+
         return True
     except Exception:
         return False
@@ -1064,11 +876,11 @@ def convert_algebraic_to_matrix(structure_name):
     try:
         if structure_name not in algebraic_structures:
             return "Structure not found"
-            
+
         structure = algebraic_structures[structure_name]
         elements = list(structure['elements'])
         operation = structure['operations'].get('*', {})
-        
+
         matrix_name = f"M_{structure_name}"
         matrix = []
         for i in range(len(elements)):
@@ -1078,7 +890,7 @@ def convert_algebraic_to_matrix(structure_name):
                 idx = elements.index(element)
                 row.append(idx)
             matrix.append(row)
-            
+
         matrices[matrix_name] = sp.Matrix(matrix)
         return f"Structure {structure_name} converted to matrix {matrix_name}"
     except Exception as e:
@@ -1089,13 +901,13 @@ def tensor_structure_product(tensor_name, structure_name):
     try:
         if tensor_name not in tensors or structure_name not in algebraic_structures:
             return "Tensor or structure not found"
-            
+
         tensor = tensors[tensor_name]
         structure = algebraic_structures[structure_name]
-        
+
         # Implementation of tensor-structure product
         result = compute_tensor_structure_product(tensor, structure)
-        
+
         return result
     except Exception as e:
         return f"Error in tensor-structure product: {e}"
@@ -1105,11 +917,11 @@ def define_tensor(name, components, rank):
     try:
         # Parse components string into a nested list/array
         components = eval(f"[{components}]")
-        
+
         # Validate tensor structure based on rank
         if not validate_tensor_structure(components, rank):
             return "Invalid tensor structure for given rank"
-            
+
         tensors[name] = {
             'components': components,
             'rank': rank
@@ -1138,10 +950,10 @@ def compute_tensor_structure_product(tensor, structure):
         tensor_components = tensor['components']
         structure_elements = structure['elements']
         operation = structure['operations'].get('*', {})
-        
+
         # Result will have rank = tensor rank + 1
         result = []
-        
+
         # For each tensor component
         for component in tensor_components:
             # For each structure element
@@ -1154,7 +966,7 @@ def compute_tensor_structure_product(tensor, structure):
                     # Higher rank case - recursive computation needed
                     row.append([operation[c][element] for c in component])
             result.append(row)
-            
+
         return result
     except Exception as e:
         return f"Error in tensor-structure product: {e}"
@@ -1164,10 +976,10 @@ def structure_homomorphism(structure_name, func_name):
     try:
         if structure_name not in algebraic_structures or func_name not in functions:
             return "Structure or function not found"
-            
+
         structure = algebraic_structures[structure_name]
         func = functions[func_name]
-        
+
         # Check homomorphism property for each operation
         for op_name, operation in structure['operations'].items():
             for a in structure['elements']:
@@ -1177,7 +989,7 @@ def structure_homomorphism(structure_name, func_name):
                     right_side = operation[func(a)][func(b)]
                     if left_side != right_side:
                         return f"Not a homomorphism for operation {op_name}"
-                        
+
         return "Function is a homomorphism"
     except Exception as e:
         return f"Error checking homomorphism: {e}"
@@ -1190,25 +1002,25 @@ def validate_group(elements, operation, properties):
             for b in elements:
                 if operation[a][b] not in elements:
                     return False
-                    
+
         # Check associativity
         for a in elements:
             for b in elements:
                 for c in elements:
                     if operation[operation[a][b]][c] != operation[a][operation[b][c]]:
                         return False
-                        
+
         # Check identity
         identity = properties.get('identity')
         if not identity or identity not in elements:
             return False
-            
+
         # Check inverses
         inverses = properties.get('inverse', {})
         for a in elements:
             if a not in inverses or operation[a][inverses[a]] != identity:
                 return False
-                
+
         return True
     except Exception:
         return False
@@ -1219,13 +1031,13 @@ def compute_automorphisms(structure):
         elements = structure['elements']
         operation = structure['operations'].get('*', {})
         automorphisms = []
-        
+
         # Generate all possible bijective mappings
         for perm in permutations(elements):
             mapping = dict(zip(elements, perm))
             if is_homomorphism(mapping, structure, structure):
                 automorphisms.append(mapping)
-                
+
         return f"Automorphisms: {automorphisms}"
     except Exception as e:
         return f"Error computing automorphisms: {e}"
@@ -1236,7 +1048,7 @@ def is_homomorphism(mapping, structure1, structure2):
         # Check if mapping preserves operations
         for op_name, operation1 in structure1['operations'].items():
             operation2 = structure2['operations'].get(op_name, {})
-            
+
             for a in structure1['elements']:
                 for b in structure1['elements']:
                     if a not in mapping or b not in mapping:
@@ -1268,22 +1080,22 @@ def inverse(element, structure):
             inverses = structure['properties']['inverse']
             if element in inverses:
                 return inverses[element]
-        
+
         # If not in properties, compute it
         elements = structure['elements']
         operation = structure['operations'].get('*', {})
         identity = structure['properties'].get('identity')
-        
+
         # If no identity element, can't find inverse
         if not identity:
             return None
-            
+
         # Search for inverse by checking operation result
         for e in elements:
-            if (operation[element][e] == identity and 
+            if (operation[element][e] == identity and
                 operation[e][element] == identity):
                 return e
-                
+
         return None  # No inverse found
     except Exception as e:
         return f"Error finding inverse: {e}"
@@ -1297,10 +1109,10 @@ def detect_and_solve_equation(equation, conditions=None):
             lhs, rhs = lhs.strip(), rhs.strip()
         else:
             lhs, rhs = equation.strip(), '0'
-            
+
         # Analyze equation
         eq_type, variables = analyze_equation(lhs + '=' + rhs)
-        
+
         # Parse conditions if provided
         parsed_conditions = []
         if conditions:
@@ -1309,13 +1121,13 @@ def detect_and_solve_equation(equation, conditions=None):
                     left, right = condition.split('=')
                     left = left.strip()
                     right = right.strip()
-                    
+
                     if '(' in left:
                         # Handle multi-variable conditions like y(x,0) = -x
                         func_name = left[:left.index('(')]
                         point_str = left[left.index('(')+1:left.index(')')]
                         points = [p.strip() for p in point_str.split(',')]
-                        
+
                         parsed_conditions.append({
                             'type': 'value',
                             'points': points,
@@ -1330,19 +1142,19 @@ def detect_and_solve_equation(equation, conditions=None):
                             'point': point,
                             'value': float(right)
                         })
-        
+
         # Force PDE if multiple variables detected in derivatives or conditions
         if any(',' in str(cond.get('points', '')) for cond in parsed_conditions):
             eq_type = 'pde'
         elif variables['derivatives'] and len(set(d[1] for d in variables['derivatives'])) > 1:
             eq_type = 'pde'
-            
+
         # Solve based on type
         if eq_type == 'pde':
             return solve_pde(lhs, rhs, variables, parsed_conditions)
         else:
             return solve_ode(lhs, rhs, variables, parsed_conditions)
-            
+
     except Exception as e:
         return f"Error in equation detection: {str(e)}"
 
@@ -1351,7 +1163,7 @@ def analyze_equation(equation):
     try:
         # Remove spaces
         eq = equation.replace(' ', '')
-        
+
         # Initialize variables dictionary
         variables = {
             'dependent': None,
@@ -1359,30 +1171,30 @@ def analyze_equation(equation):
             'derivatives': [],
             'functions': set()
         }
-        
+
         # Find all derivatives
         derivatives = re.findall(r'd([a-zA-Z][a-zA-Z0-9]*)/d([a-zA-Z][a-zA-Z0-9]*)', eq)
         primed = re.findall(r'([a-zA-Z][a-zA-Z0-9]*)[\'"]+', eq)
-        
+
         if derivatives:
             # Get variables from derivatives
             dep_vars = {d[0] for d in derivatives}
             indep_vars = {d[1] for d in derivatives}
-            
+
             variables['dependent'] = list(dep_vars)[0]
             variables['independent'] = indep_vars
             variables['derivatives'] = derivatives
-            
+
             # It's a PDE only if we have multiple DIFFERENT independent variables
             return ('pde' if len(indep_vars) > 1 else 'ode', variables)
-            
+
         elif primed:
             # Handle primed notation (always ODE)
             variables['dependent'] = primed[0]
             all_vars = set(re.findall(r'[a-zA-Z][a-zA-Z0-9]*', eq)) - {'d'} - {variables['dependent']}
             variables['independent'] = {next(iter(all_vars))} if all_vars else {'x'}
             return ('ode', variables)
-            
+
         else:
             # Default case
             all_vars = list(set(re.findall(r'[a-zA-Z][a-zA-Z0-9]*', eq)) - {'d'})
@@ -1393,7 +1205,7 @@ def analyze_equation(equation):
                 variables['dependent'] = 'y'
                 variables['independent'] = {'x'}
             return ('ode', variables)
-            
+
     except Exception as e:
         raise Exception(f"Error in analysis: {e}")
 
@@ -1403,32 +1215,32 @@ def solve_ode(lhs, rhs, variables, conditions=None):
         # Create symbols
         x = sp.Symbol(list(variables['independent'])[0])
         y = sp.Function(variables['dependent'])
-        
+
         # Process equation
         expr = lhs
         dep_var = variables['dependent']
         indep_var = list(variables['independent'])[0]
-        
+
         # Create local dictionary
         local_dict = {
             indep_var: x,
             dep_var: y
         }
-        
+
         # Replace derivatives
         if variables['derivatives']:
-            expr = expr.replace(f'd{dep_var}/d{indep_var}', 
+            expr = expr.replace(f'd{dep_var}/d{indep_var}',
                               str(sp.Derivative(y(x), x)))
-        
+
         # Replace function calls
         pattern = rf'\b{dep_var}\b(?!\()'
         expr = re.sub(pattern, f'{dep_var}({indep_var})', expr)
-        
+
         # Create equation
         lhs_expr = sp.sympify(expr, locals=local_dict)
         rhs_expr = sp.sympify(rhs, locals=local_dict)
         eq = sp.Eq(lhs_expr, rhs_expr)
-        
+
         # Solve ODE
         if conditions:
             ics = {}
@@ -1440,9 +1252,9 @@ def solve_ode(lhs, rhs, variables, conditions=None):
             solution = sp.dsolve(eq, y(x), ics=ics)
         else:
             solution = sp.dsolve(eq, y(x))
-            
+
         return f"ODE Solution: {solution}"
-        
+
     except Exception as e:
         return f"Error in solve_ode: {str(e)}\nEquation parsed as: {expr}"
 
@@ -1454,36 +1266,36 @@ def solve_pde(lhs, rhs, variables, conditions=None):
         dep_var = variables['dependent']
         u = sp.Function(dep_var)  # Use the actual dependent variable name
         F = sp.Function('F')  # Arbitrary function
-        
+
         # Create local dictionary with all symbols
         local_dict = {
             **var_symbols,  # All independent variables
             dep_var: u,
             'F': F
         }
-        
+
         # Process equation
         expr = lhs
-        
+
         # Replace partial derivatives
         for d_var, i_var in variables['derivatives']:
             expr = expr.replace(
-                f'd{d_var}/d{i_var}', 
+                f'd{d_var}/d{i_var}',
                 str(sp.Derivative(u(*var_symbols.values()), var_symbols[i_var]))
             )
-        
+
         # Replace function calls
         pattern = rf'\b{dep_var}\b(?!\()'
         expr = re.sub(pattern, f'{dep_var}({",".join(var_symbols.keys())})', expr)
-        
+
         # Create equation
         lhs_expr = sp.sympify(expr, locals=local_dict)
         rhs_expr = sp.sympify(rhs, locals=local_dict)
         eq = sp.Eq(lhs_expr, rhs_expr)
-        
+
         # Get general solution
         general = sp.pdsolve(eq, u(*var_symbols.values()))
-        
+
         # If we have conditions, solve for F
         if conditions:
             # Process all conditions
@@ -1494,7 +1306,7 @@ def solve_pde(lhs, rhs, variables, conditions=None):
                         # Parse condition points and value
                         if isinstance(cond['points'], list):
                             # Full point specification y(x,t) = value
-                            points = {var: sp.sympify(val, locals=local_dict) 
+                            points = {var: sp.sympify(val, locals=local_dict)
                                     for var, val in zip(var_symbols.keys(), cond['points'])}
                         else:
                             # Single variable specification y(x) = f(t) or y(t) = f(x)
@@ -1502,45 +1314,45 @@ def solve_pde(lhs, rhs, variables, conditions=None):
                             other_vars = set(var_symbols.keys()) - {var}
                             points = {v: var_symbols[v] for v in other_vars}
                             points[var] = 0  # Set specified variable to 0
-                            
+
                         # Parse value expression
                         value_expr = sp.sympify(cond['value'], locals=local_dict)
-                        
+
                         # Create condition equation
                         cond_eq = sp.Eq(general.rhs.subs(points), value_expr)
                         condition_eqs.append((cond_eq, points, value_expr))
-                        
+
                     except Exception as e:
                         print(f"Warning: Could not process condition: {e}")
-            
+
             # Try to solve the system of conditions
             if condition_eqs:
                 try:
                     # Get characteristic variable
-                    char_var = next(arg for arg in general.rhs.find(F) 
+                    char_var = next(arg for arg in general.rhs.find(F)
                                   if isinstance(arg, sp.Function)).args[0]
-                    
+
                     # Use all conditions to determine F
                     particular = general.rhs
                     for cond_eq, points, value_expr in condition_eqs:
                         char_val = char_var.subs(points)
-                        
+
                         # Update particular solution
                         particular = particular.subs(
                             F(char_var),
                             value_expr + F(char_var) - F(char_val)
                         )
-                    
+
                     return f"PDE Solution: Eq({dep_var}({','.join(var_symbols.keys())}), {particular})"
-                    
+
                 except Exception as e:
                     print(f"Warning: Could not solve for particular solution: {e}")
-        
+
         return f"PDE Solution: {general}"
-        
+
     except Exception as e:
         return f"Error in solve_pde: {str(e)}\nEquation parsed as: {expr}"
-    
+
 def compute_roots(expression, variable):
     try:
         processed_expression = preprocess_expression(expression)
@@ -1548,14 +1360,203 @@ def compute_roots(expression, variable):
         expr = sp.sympify(processed_expression, locals={**variables, **functions})
 
         solutions = sp.solve(expr, var_symbol)
-        
+
         if solutions:
             cleaned_solutions = [clean_multiplication(str(sol)) for sol in solutions]
             return f"Roots: {', '.join(cleaned_solutions)}"
         else:
             return "No roots found."
-    
+
     except Exception as e:
         return f"Error in compute_roots: {e}"
+
+def process_commands():
+    while True:
+        try:
+            user_input = input("Cardano CLI > ")
+
+            # Basic commands
+            if user_input.lower() == 'exit':
+                break
+            elif user_input.lower() == 'cls':
+                print(clear_screen())
+            elif user_input.lower() == 'help':
+                print(get_help())
+            elif user_input.lower() == 'clear all':
+                print(clear_all())
+
+            # Clear specific objects
+            elif user_input.lower().startswith('clear '):
+                name = user_input.split(' ')[1]
+                if name in variables:
+                    print(clear_variable(name))
+                elif name in matrices:
+                    print(clear_matrix(name))
+                elif name in user_sets:
+                    print(clear_set(name))
+                elif name in algebraic_structures:
+                    print(clear_algebraic_structure(name))
+                elif name in tensors:
+                    print(clear_tensor(name))
+                else:
+                    print(f"{name} not found.")
+
+            # Matrix operations
+            elif user_input.startswith('det('):
+                matrix_name = user_input[4:-1]
+                print(compute_determinant(matrix_name))
+            elif user_input.startswith('inv('):
+                matrix_name = user_input[4:-1]
+                print(compute_inverse(matrix_name))
+            elif user_input.startswith('eigenvals('):
+                matrix_name = user_input[10:-1]
+                print(compute_eigenvalues(matrix_name))
+            elif user_input.startswith('eigenvects('):
+                matrix_name = user_input[11:-1]
+                print(compute_eigenvectors(matrix_name))
+            elif user_input.startswith('transpose('):
+                matrix_name = user_input[10:-1]
+                print(transpose_matrix(matrix_name))
+            elif user_input.startswith('mul('):
+                matrices = user_input[4:-1].split(',')
+                print(multiply_matrices(matrices[0].strip(), matrices[1].strip()))
+            elif user_input.startswith('add('):
+                matrices = user_input[4:-1].split(',')
+                print(add_matrices(matrices[0].strip(), matrices[1].strip()))
+
+            # Differential equations
+            elif user_input.startswith('solve ode ') or user_input.startswith('solve pde '):
+               parts = user_input.split(',')
+               equation = parts[0].replace('solve ode ', '').replace('solve pde ', '').strip()
+               conditions = [cond.strip() for cond in parts[1:]] if len(parts) > 1 else None
+               print(detect_and_solve_equation(equation, conditions))
+
+            # Calculus operations
+            elif user_input.startswith('d/dx('):
+                expr = user_input[5:-1]
+                print(compute_derivative(expr, 'x'))
+            elif user_input.startswith('dd/ddx('):
+                parts = user_input[7:-1].split(',')
+                print(compute_partial_derivative(parts[0], parts[1]))
+            elif user_input.startswith('indefinite integral('):
+                parts = user_input[19:-1].split(',')
+                print(compute_indefinite_integral(parts[0], parts[1]))
+            elif user_input.startswith('definite integral('):
+                parts = user_input[17:-1].split(',')
+                print(compute_definite_integral(parts[0], parts[1], parts[2], parts[3]))
+            elif user_input.startswith('derivative('):
+                parts = user_input[11:-1].split(',')
+                print(compute_higher_order_derivative(parts[0], parts[1], int(parts[2])))
+
+            # Series and sums
+            elif user_input.startswith('series('):
+                parts = user_input[7:-1].split(',')
+                print(compute_infinite_series(parts[0], parts[1], int(parts[2])))
+            elif user_input.startswith('sum('):
+                parts = user_input[4:-1].split(',')
+                print(compute_large_sum(parts[0], parts[1], int(parts[2]), int(parts[3])))
+            elif user_input.startswith('product('):
+                parts = user_input[8:-1].split(',')
+                print(compute_large_product(parts[0], parts[1], int(parts[2]), int(parts[3])))
+            elif user_input.startswith('isum('):
+                parts = user_input[5:-1].split(',')
+                print(compute_sum(parts[0].strip(), parts[1].strip(), int(parts[2].strip())))
+            elif user_input.startswith('iproduct('):
+                parts = user_input[9:-1].split(',')
+                print(compute_product(parts[0].strip(), parts[1].strip(), int(parts[2].strip())))
+
+            # Algebraic structures and operations
+            elif user_input.startswith('center '):
+                name = user_input.split()[1]
+                print(compute_center(algebraic_structures.get(name)))
+            elif user_input.startswith('generators '):
+                name = user_input.split()[1]
+                print(find_generators(algebraic_structures.get(name)))
+            elif user_input.startswith('is_cyclic '):
+                name = user_input.split()[1]
+                print(is_cyclic_structure(algebraic_structures.get(name)))
+            elif user_input.startswith('quotient '):
+                name1, name2 = user_input.split()[1:]
+                print(algebraic_operation(name1, 'quotient', name2))
+            elif user_input.startswith('direct_product '):
+                name1, name2 = user_input.split()[1:]
+                print(algebraic_operation(name1, 'direct_product', name2))
+            elif user_input.startswith('convert_matrix '):
+                name = user_input.split()[1]
+                print(convert_algebraic_to_matrix(name))
+            elif user_input.startswith('tensor_product '):
+                tensor_name, structure_name = user_input.split()[1:]
+                print(tensor_structure_product(tensor_name, structure_name))
+            elif user_input.startswith('homomorphism '):
+                structure_name, func_name = user_input.split()[1:]
+                print(structure_homomorphism(structure_name, func_name))
+
+            # Set operations and definitions
+            elif ':=' in user_input and '{' in user_input:
+                name, set_def = user_input.split(':=')
+                if 'tensor' in set_def.lower():
+                    pattern = r'tensor\s*\{([^}]+)\}\s*rank\s*(\d+)'
+                    match = re.match(pattern, set_def.strip())
+                    if match:
+                        components, rank = match.groups()
+                        print(define_tensor(name.strip(), components, int(rank)))
+                else:
+                    print(define_set(name.strip(), set_def.strip()))
+
+            # Function definitions
+            elif '::' in user_input:
+                print(define_function(user_input))
+
+            # Algebraic structure definitions
+            elif any(s in user_input for s in ['group', 'ring', 'field', 'monoid']):
+                structure_type = next(s for s in ['group', 'ring', 'field', 'monoid']
+                                   if s in user_input)
+                match = re.match(
+                    f'({structure_type})\s+([A-Za-z][A-Za-z0-9]*)\s+(.*)',
+                    user_input,
+                    re.IGNORECASE
+                )
+                if match:
+                    _, name, params = match.groups()
+                    print(define_algebraic_structure(structure_type, name, params))
+
+            # Root computation
+            elif user_input.startswith('nroot('):
+                parts = user_input[6:-1].split(',')
+                print(compute_nroot(parts[0].strip(), parts[1].strip()))
+
+            # Equation solving
+            elif '=' in user_input and 'solve' not in user_input:
+                print(solve_equation(user_input))
+
+            # System of equations
+            elif user_input.startswith('solve '):
+                equations = [eq.strip() for eq in user_input[6:].split(',')]
+                if len(equations) > 1:
+                    print(solve_system_of_equations(equations))
+                else:
+                    print(solve_equation(equations[0]))
+
+            # Variable assignments
+            elif ':=' in user_input and '::' not in user_input:
+                name, expr = user_input.split(':=')
+                if '{' in expr and '}' in expr:  # Matrix definition
+                    print(define_matrix(name.strip(), expr.strip()))
+                else:  # Variable definition
+                    print(define_variable(name.strip(), expr.strip()))
+
+
+            elif 'root' in user_input:
+                match = re.match(r'root\((.*),\s*(\w+)\)', user_input)
+                if match:
+                    expression, variable = match.groups()
+                    print(compute_roots(expression, variable))
+
+            # Default expression evaluation
+            else:
+                print(evaluate_expression(user_input))
+
+        except Exception as e:
+            print(f"Error in command processing: {e}")
 
 process_commands()
